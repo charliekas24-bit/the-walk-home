@@ -4,6 +4,8 @@ const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const ui = Object.fromEntries(['distance','best','lives','level','checkpoint','drift','overlay','screen-title','screen-copy','result','start','pause','motion','toast'].map(id => [id,document.getElementById(id)]));
 const W=960, H=600, ROAD_LEFT=285, ROAD_RIGHT=675, PLAYER_Y=475;
+// Harder pacing: a level every 120m, with a firm cap to keep steering viable.
+const START_SPEED=220, MAX_SPEED=520, LEVEL_DISTANCE=120, BLUR_DURATION=1.2;
 const keys = new Set();
 const locations=['Campus Bar District','High Street','The Library','Campus Construction','Wrong Way','Almost Home'];
 const types=['scooter','cone','pothole','trash','car','students','sign','puddle','barrier'];
@@ -11,10 +13,12 @@ const sizes={scooter:[30,55],cone:[34,38],pothole:[57,28],trash:[35,43],car:[58,
 const jokes={scooter:'Defeated by a Lime scooter.',cone:'The construction cone won.',pothole:'A pothole with a minor in sabotage.',trash:'Your night has been officially binned.',car:'Parked cars: still undefeated.',students:'The group project blocked your path.',sign:'The sign said stop. You listened.',puddle:'Your shoes have left the chat.',barrier:'Expected completion: never.'};
 let best=0;
 try{const saved=Number(localStorage.getItem('walkHomeBest'));best=Number.isFinite(saved)?Math.max(0,Math.floor(saved)):0;}catch{/* Private browsing must not prevent play. */}
-let state='ready',distance=0,level=1,lives=3,speed=180,scroll=0,elapsed=0,spawnTimer=1,invincible=0;
+let state='ready',distance=0,level=1,lives=3,speed=START_SPEED,scroll=0,elapsed=0,spawnTimer=1,invincible=0;
 let playerX=480,obstacles=[],particles=[],lastTime=0,toastTimer=0,driftForce=0,driftTimer=2;
+let runners=[],runnerTimer=2,blurTimer=8,blurRemaining=0;
 let reducedMotion=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-ui.motion.textContent=`Sway: ${reducedMotion?'OFF':'ON'}`;ui.motion.setAttribute('aria-pressed',String(reducedMotion));
+function updateEffectsButton(){ui.motion.textContent=`Sway + blur: ${reducedMotion?'OFF':'ON'}`;ui.motion.setAttribute('aria-pressed',String(reducedMotion));}
+updateEffectsButton();
 const random=(min,max)=>min+Math.random()*(max-min);
 const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
 function updateHUD(){
@@ -23,16 +27,17 @@ function updateHUD(){
   ui.lives.textContent='♥ '.repeat(lives)+'♡ '.repeat(3-lives);ui.lives.setAttribute('aria-label',`${lives} lives`);
   ui.level.innerHTML=`${String(level).padStart(2,'0')} <small>${level<3?'FRESH LEGS':level<6?'SIDEWALK SHUFFLE':'LATE-NIGHT LEGEND'}</small>`;
   ui.checkpoint.textContent=locations[Math.floor(distance/250)%locations.length];
-  ui.drift.textContent=level<3?'STEADY FEET • FOR NOW':'MILD DRIFT • KEEP STEERING';
+  ui.drift.textContent=blurRemaining>0&&!reducedMotion?'FOCUS, BUDDY…':level<3?'STEADY FEET • FOR NOW':'MILD DRIFT • KEEP STEERING';
 }
 function toast(message){ui.toast.textContent=message;toastTimer=2.5;ui.toast.classList.add('visible');}
 function startGame(){
-  state='playing';distance=0;level=1;lives=3;speed=180;elapsed=0;scroll=0;spawnTimer=1;invincible=0;
+  state='playing';distance=0;level=1;lives=3;speed=START_SPEED;elapsed=0;scroll=0;spawnTimer=1;invincible=0;
+  runners=[];runnerTimer=2;blurTimer=8;blurRemaining=0;canvas.style.filter='none';
   playerX=480;obstacles=[];particles=[];driftForce=0;driftTimer=2;keys.clear();toastTimer=0;ui.toast.classList.remove('visible');
   ui.overlay.hidden=true;ui.pause.disabled=false;ui.pause.textContent='Ⅱ';ui.pause.setAttribute('aria-label','Pause game');updateHUD();
 }
 function endGame(type){
-  state='over';keys.clear();best=Math.max(best,Math.floor(distance));
+  state='over';keys.clear();canvas.style.filter='none';best=Math.max(best,Math.floor(distance));
   try{localStorage.setItem('walkHomeBest',String(best));}catch{/* Best still works in memory when storage is blocked. */}
   ui['screen-title'].innerHTML="YOU DIDN’T<br>MAKE IT <span>HOME</span>";
   ui['screen-title'].style.fontSize='clamp(30px, 4.7vw, 57px)';
@@ -43,13 +48,13 @@ function endGame(type){
 }
 function togglePause(){
   if(state!=='playing'&&state!=='paused')return;
-  state=state==='playing'?'paused':'playing';keys.clear();ui.overlay.hidden=state==='playing';
+  state=state==='playing'?'paused':'playing';keys.clear();ui.overlay.hidden=state==='playing';canvas.style.filter='none';
   ui.pause.textContent=state==='paused'?'▶':'Ⅱ';ui.pause.setAttribute('aria-label',state==='paused'?'Resume game':'Pause game');
   if(state==='paused'){ui['screen-title'].innerHTML='TAKE A<br><span>BREATHER</span>';ui['screen-title'].style.fontSize='';ui['screen-copy'].textContent='Your sidewalk will be right here.';ui.result.hidden=true;ui.start.innerHTML='RESUME <span>↗</span>';ui.start.focus();}
 }
 ui.start.addEventListener('click',()=>state==='paused'?togglePause():startGame());
 ui.pause.addEventListener('click',togglePause);
-ui.motion.addEventListener('click',()=>{reducedMotion=!reducedMotion;ui.motion.textContent=`Sway: ${reducedMotion?'OFF':'ON'}`;ui.motion.setAttribute('aria-pressed',String(reducedMotion));});
+ui.motion.addEventListener('click',()=>{reducedMotion=!reducedMotion;blurRemaining=0;blurTimer=8;canvas.style.filter='none';updateEffectsButton();});
 window.addEventListener('keydown',event=>{
   const key=event.key.toLowerCase();
   if(['arrowleft','arrowright','a','d'].includes(key)){if(state==='playing')event.preventDefault();keys.add(key);}
@@ -71,20 +76,46 @@ function spawnObstacle(){
   obstacles.push({type,x,y:-110,w,h,vx:type==='car'&&level>3?random(-12,12):0});
 }
 function overlaps(a,b){return Math.abs(a.x-b.x)<(a.w+b.w)/2&&Math.abs(a.y-b.y)<(a.h+b.h)/2;}
+// Crossers telegraph their direction for 0.85s before entering the street.
+// Only one crosses at a time; unlike cars they exit rather than clamp to a curb.
+function spawnRunner(){
+  const direction=Math.random()<.5?1:-1;
+  runners.push({type:'runner',x:direction===1?ROAD_LEFT-18:ROAD_RIGHT+18,y:PLAYER_Y-90,w:30,h:39,vx:direction*Math.min(280,190+level*12),warning:.85});
+  toast(direction===1?'RUNNER FROM THE LEFT →':'← RUNNER FROM THE RIGHT');
+}
+jokes.runner='Late for a party. Early for a collision.';
+function updateBlur(dt){
+  if(reducedMotion||level<3){blurRemaining=0;return;}
+  if(blurRemaining>0){blurRemaining=Math.max(0,blurRemaining-dt);return;}
+  blurTimer-=dt;
+  // Never start a pulse during a crossing or post-hit recovery.
+  if(blurTimer<=0&&runners.length===0&&invincible===0){blurRemaining=BLUR_DURATION;blurTimer=random(8,12);}
+}
 function update(dt){
   elapsed+=dt;distance+=speed*dt/12;scroll+=speed*dt;
-  const newLevel=1+Math.floor(distance/200);
+  const newLevel=1+Math.floor(distance/LEVEL_DISTANCE);
   if(newLevel!==level){level=newLevel;toast(`LEVEL ${level} · ${level===3?'Your feet have entered freestyle mode.':'The sidewalk has other plans.'}`);}
-  speed=Math.min(390,180+(level-1)*23);
+  speed=Math.min(MAX_SPEED,START_SPEED+(level-1)*40);
   // Drift is a small extra velocity, at most 24px/sec versus 300px/sec steering.
   driftTimer-=dt;
   if(driftTimer<=0){driftForce=level>=3?random(-1,1)*Math.min(24,(level-2)*5):0;driftTimer=random(1.4,2.8);}
   const direction=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
   playerX=clamp(playerX+(direction*300+driftForce)*dt,ROAD_LEFT+18,ROAD_RIGHT-18);
-  spawnTimer-=dt;if(spawnTimer<=0){spawnObstacle();spawnTimer=Math.max(.62,1.08-(level-1)*.045);}
+  spawnTimer-=dt;if(spawnTimer<=0){spawnObstacle();spawnTimer=Math.max(.48,.9-(level-1)*.06);}
+  if(level>=2){
+    runnerTimer-=dt;
+    if(runnerTimer<=0&&runners.length===0&&blurRemaining===0){spawnRunner();runnerTimer=Math.max(3.2,6-level*.3);}
+  }
+  for(const runner of runners){
+    if(runner.warning>0){runner.warning=Math.max(0,runner.warning-dt);continue;}
+    runner.x+=runner.vx*dt;runner.y+=speed*.22*dt;
+  }
+  runners=runners.filter(r=>r.x>ROAD_LEFT-60&&r.x<ROAD_RIGHT+60&&r.y<H+50);
+  updateBlur(dt);
   invincible=Math.max(0,invincible-dt);
-  for(const obstacle of obstacles){
-    obstacle.y+=speed*dt;obstacle.x=clamp(obstacle.x+obstacle.vx*dt,ROAD_LEFT+obstacle.w/2,ROAD_RIGHT-obstacle.w/2);
+  for(const obstacle of [...obstacles,...runners]){
+    if(obstacle.type==='runner'){if(obstacle.warning>0)continue;}
+    else{obstacle.y+=speed*dt;obstacle.x=clamp(obstacle.x+obstacle.vx*dt,ROAD_LEFT+obstacle.w/2,ROAD_RIGHT-obstacle.w/2);}
     // Smaller-than-art hitboxes make close calls feel fair.
     if(invincible===0&&overlaps({x:playerX,y:PLAYER_Y,w:22,h:29},{...obstacle,w:obstacle.w*.78,h:obstacle.h*.78})){
       lives--;invincible=1.6;toast(jokes[obstacle.type]);
@@ -149,11 +180,24 @@ function drawObstacle(o){
   }ctx.restore();
 }
 function render(){
+  // Blur only the scene, not the score, warning labels, menus, or controls.
+  // A smooth pulse tops out at 1.4px and clears instantly outside active play.
+  const blur=state==='playing'&&!reducedMotion&&blurRemaining>0?Math.sin(Math.PI*blurRemaining/BLUR_DURATION)*1.4:0;
+  canvas.style.filter=blur>.01?`blur(${blur.toFixed(2)}px)`:'none';
   ctx.clearRect(0,0,W,H);ctx.save();
   if(!reducedMotion&&state==='playing'&&level>=3){ctx.translate(W/2,H/2);ctx.rotate(Math.sin(elapsed*.8)*.004);ctx.translate(-W/2,-H/2);}
   scenery();
   if(state==='ready'){[{type:'cone',x:365,y:130},{type:'scooter',x:590,y:235},{type:'car',x:330,y:540},{type:'puddle',x:585,y:540}].forEach(drawObstacle);}
   obstacles.forEach(drawObstacle);
+  for(const runner of runners){
+    ctx.save();ctx.translate(runner.x,runner.y);
+    if(runner.warning>0){
+      rect(runner.vx>0?12:-110,-43,98,25,'#231c21',5);
+      label(runner.vx>0?'RUNNER →':'← RUNNER',runner.vx>0?61:-61,-26,12,'#ffcf80');
+    }
+    ctx.rotate(runner.vx>0?Math.PI/2:-Math.PI/2);
+    person(0,0,'#e7b65b',runner.warning===0);ctx.restore();
+  }
   if(invincible===0||Math.floor(invincible*8)%2===0)person(playerX,PLAYER_Y,'#d84b64',state==='playing');
   particles.forEach(p=>rect(p.x,p.y,4,4,'#f7d7a2'));
   ctx.restore();

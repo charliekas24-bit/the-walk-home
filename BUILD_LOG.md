@@ -30,7 +30,16 @@
 - Live-browser smoke check: clicked START, observed distance increasing, and found no captured browser-console errors. Automated game-rule checks were rerun successfully before publication.
 - No unfamiliar-user test, signed-out browser test, or physical second-device test has been completed. Do not claim those until observed.
 
-## Next: student verification and revision
+## 2026-08-27 · Harder nights revision
+
+- Student requested faster difficulty progression, people running across the road, and occasional mild blur, and asked to update the same public URL.
+- Increased starting speed from 180 to 220 px/sec, level increments from 23 to 40 px/sec, and the cap from 390 to 520. Levels now advance every 120m instead of 200m; obstacle intervals decrease from 0.9 to 0.48 seconds.
+- Added amber-shirted runners from level 2. They give a directional warning for 0.85 seconds, cross from either side, and leave the street. Only one runner is active at a time.
+- Added smooth 1.2-second blur pulses (maximum 1.4px) with 8–12 seconds between pulses from level 3. They do not start during a runner crossing or hit recovery. HUD and menus remain sharp. The Sway + blur control and reduced-motion preference disable visual effects.
+- Kept three lives and 1.6-second hit protection. Preserved existing best distances, including those set under the original easier rules.
+- Syntax and regression checks passed, including faster level progression, warning delay, runner movement/collision/exit, blur duration, crossing exclusion, reduced motion, restart cleanup, and a ten-minute simulated run. These automated checks are not an unfamiliar-user test.
+
+## Remaining student verification
 
 1. Read the code and explain input, collision, scoring, and restart.
 2. Run the silent unfamiliar-user test in USER_TEST.md.

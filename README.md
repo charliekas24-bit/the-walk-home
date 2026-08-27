@@ -11,8 +11,10 @@ Open this folder in VS Code. Right-click `index.html` and choose **Open with Liv
 - A/D or left/right arrow keys: move. On phones, hold the left/right buttons.
 - P, Escape, or the pause button: pause/resume. Switching tabs pauses automatically.
 - Avoid obstacles; three hits end a run. After a hit, 1.6 seconds of protection prevents instant repeated damage.
-- Distance increases with survival time. Every 200 meters adds a level. Speed and spawn frequency rise, then cap.
-- Mild steering drift starts at level 3. Sway can be disabled; reduced-motion preferences disable it initially.
+- Distance increases with survival time. Every 120 meters adds a level. Scrolling starts at 220 px/sec, rises by 40 per level, and caps at 520. Obstacles arrive more frequently as levels rise.
+- Students run across from level 2. An amber runner and directional warning give 0.85 seconds of notice before they move. Only one crosses at a time.
+- Mild steering drift starts at level 3. Occasional 1.2-second blur pulses start later, with 8–12 seconds between pulses. Blur never starts during a crossing or hit recovery.
+- The “Sway + blur” switch disables both visual effects; reduced-motion preferences disable them initially. Score and controls remain sharp. Steering drift stays active.
 - Best distance is saved on this browser using localStorage. It is not a shared leaderboard.
 - This is an endless survival game: “Almost Home” is a joke checkpoint, not a finish line.
 
