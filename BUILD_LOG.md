@@ -25,7 +25,9 @@
 - The hosting wrapper compiled successfully; the local VS Code game remains standalone and has no framework dependency.
 - Automated logic checks passed: movement, boundary clamp, levels, collision damage, grace period, game over, persistence, reset, pause/resume, speed cap, spawn bounds, and blocked storage writes. These use a mocked DOM, not browser interaction.
 - A further 10-minute simulated run with restarts and all obstacle draw paths passed using mock Canvas calls. Blocked-storage startup also passed. This checks code paths, not visual appearance.
-- Initial GitHub connection exposed no repositories. With the student's explicit approval, created the public repository `charliekas24-bit/the-walk-home` through the signed-in GitHub website. Publishing the standalone game and this log to its main branch; GitHub Pages deployment is next.
+- Initial GitHub connection exposed no repositories. With the student's explicit approval, created the public repository `charliekas24-bit/the-walk-home` through the signed-in GitHub website. Uploaded the standalone game, build log, and submission worksheets to `main`.
+- Enabled GitHub Pages from `main` / root with HTTPS. Public game: https://charliekas24-bit.github.io/the-walk-home/ . The public page loaded successfully and displayed the game's start screen without a login prompt.
+- Live-browser smoke check: clicked START, observed distance increasing, and found no captured browser-console errors. Automated game-rule checks were rerun successfully before publication.
 - No unfamiliar-user test, signed-out browser test, or physical second-device test has been completed. Do not claim those until observed.
 
 ## Next: student verification and revision

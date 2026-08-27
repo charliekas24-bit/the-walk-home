@@ -26,4 +26,6 @@ The game was generated with Codex from the student's detailed specification. The
 
 Repository: https://github.com/charliekas24-bit/the-walk-home
 
-GitHub Pages publication is being configured. See BUILD_LOG.md for verification and submission notes.
+Play online: https://charliekas24-bit.github.io/the-walk-home/
+
+GitHub Pages serves the standalone files from the root of the `main` branch. See BUILD_LOG.md for verification and submission notes.
