@@ -38,6 +38,7 @@
 - Added smooth 1.2-second blur pulses (maximum 1.4px) with 8–12 seconds between pulses from level 3. They do not start during a runner crossing or hit recovery. HUD and menus remain sharp. The Sway + blur control and reduced-motion preference disable visual effects.
 - Kept three lives and 1.6-second hit protection. Preserved existing best distances, including those set under the original easier rules.
 - Syntax and regression checks passed, including faster level progression, warning delay, runner movement/collision/exit, blur duration, crossing exclusion, reduced motion, restart cleanup, and a ten-minute simulated run. These automated checks are not an unfamiliar-user test.
+- Publication check caught a cached old JavaScript file alongside the new HTML. Added a version query to the script URL so returning players fetch the updated game code.
 
 ## Remaining student verification
 
